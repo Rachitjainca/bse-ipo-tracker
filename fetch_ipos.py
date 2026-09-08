@@ -104,17 +104,36 @@ def fetch_bse_ipos() -> list[dict]:
 
 def fetch_nse_ipos() -> list[dict]:
     """Fetch IPOs from NSE API. Status: 'Forthcoming' or 'Active'."""
-    # NSE requires its own Referer header (not BSE's)
+    import time
+
+    # NSE requires its own Referer and needs cookies. Build separate session.
     nse_session = requests.Session()
-    nse_session.headers.update(SESSION.headers)
     nse_session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Accept-Language": "en-IN,en-US;q=0.9,en;q=0.8",
         "Referer": "https://www.nseindia.com/market-data/all-upcoming-issues-ipo",
         "Origin": "https://www.nseindia.com",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
     })
 
     try:
+        # First visit the main page to get cookies (Akamai protection)
+        nse_session.get("https://www.nseindia.com/market-data/all-upcoming-issues-ipo", timeout=10)
+        time.sleep(1)  # Small delay between requests
+
+        # Now fetch the API
         response = nse_session.get(NSE_API, timeout=10)
         response.raise_for_status()
+
+        # Check if we got HTML instead of JSON (403/block response)
+        if response.text.startswith('<'):
+            print(f"ERROR: NSE returned HTML (possible block): {response.status_code}", file=sys.stderr)
+            return []
+
         data = response.json()
     except json.JSONDecodeError as e:
         print(f"ERROR: NSE returned invalid JSON: {e}", file=sys.stderr)
