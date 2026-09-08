@@ -159,6 +159,8 @@ def fetch_nse_ipos() -> list[dict]:
 
 def _parse_nse_ipos(data: any) -> list[dict]:
     """Parse NSE response into IPO list."""
+    from datetime import datetime
+
     results = []
 
     # Handle both direct list and wrapped object responses
@@ -183,12 +185,24 @@ def _parse_nse_ipos(data: any) -> list[dict]:
         else:
             continue
 
+        # Convert NSE dates from "DD-MMM-YYYY" to "YYYY-MM-DD"
+        open_date_str = item.get("issueStartDate", "")
+        close_date_str = item.get("issueEndDate", "")
+
+        try:
+            open_date = datetime.strptime(open_date_str, "%d-%b-%Y").strftime("%Y-%m-%d") if open_date_str else ""
+            close_date = datetime.strptime(close_date_str, "%d-%b-%Y").strftime("%Y-%m-%d") if close_date_str else ""
+        except ValueError:
+            # Fallback if format is different
+            open_date = open_date_str
+            close_date = close_date_str
+
         ipo = {
             "exchange": "NSE",
             "status": status,
             "name": item.get("companyName", "").strip() or item.get("company_name", "").strip(),
-            "open_date": item.get("issueStartDate", "") or item.get("openDate", "") or item.get("open_date", ""),
-            "close_date": item.get("issueEndDate", "") or item.get("closeDate", "") or item.get("close_date", ""),
+            "open_date": open_date,
+            "close_date": close_date,
             "ipo_type": item.get("boardCode", "").strip() or item.get("board_code", "").strip() or "MainBoard",
         }
         if ipo["name"]:
