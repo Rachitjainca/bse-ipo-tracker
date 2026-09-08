@@ -106,7 +106,6 @@ def fetch_nse_ipos() -> list[dict]:
     """Fetch IPOs from NSE API. Status: 'Forthcoming' or 'Active'."""
     import time
 
-    # NSE requires its own Referer and needs cookies. Build separate session.
     nse_session = requests.Session()
     nse_session.headers.update({
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
@@ -120,28 +119,42 @@ def fetch_nse_ipos() -> list[dict]:
         "Sec-Fetch-Site": "same-origin",
     })
 
-    try:
-        # First visit the main page to get cookies (Akamai protection)
-        nse_session.get("https://www.nseindia.com/market-data/all-upcoming-issues-ipo", timeout=10)
-        time.sleep(1)  # Small delay between requests
+    results = []
+    max_retries = 3
 
-        # Now fetch the API
-        response = nse_session.get(NSE_API, timeout=10)
-        response.raise_for_status()
+    for attempt in range(max_retries):
+        try:
+            # Get cookies from main page
+            print(f"NSE attempt {attempt+1}/{max_retries}: Getting cookies...", file=sys.stderr)
+            nse_session.get("https://www.nseindia.com/market-data/all-upcoming-issues-ipo", timeout=10)
+            time.sleep(2)
 
-        # Check if we got HTML instead of JSON (403/block response)
-        if response.text.startswith('<'):
-            print(f"ERROR: NSE returned HTML (possible block): {response.status_code}", file=sys.stderr)
-            return []
+            # Fetch API
+            print(f"NSE attempt {attempt+1}/{max_retries}: Fetching API...", file=sys.stderr)
+            response = nse_session.get(NSE_API, timeout=10)
+            response.raise_for_status()
 
-        data = response.json()
-    except json.JSONDecodeError as e:
-        print(f"ERROR: NSE returned invalid JSON: {e}", file=sys.stderr)
-        return []
-    except Exception as e:
-        print(f"ERROR fetching NSE IPOs: {e}", file=sys.stderr)
-        return []
+            # Debug: check response
+            if not response.text or response.text.startswith('<'):
+                print(f"WARNING: NSE returned empty/HTML response (status {response.status_code}): {response.text[:100]}", file=sys.stderr)
+                time.sleep(3 ** attempt)  # Exponential backoff
+                continue
 
+            data = response.json()
+            return _parse_nse_ipos(data)  # Success!
+
+        except json.JSONDecodeError as e:
+            print(f"ERROR: NSE returned invalid JSON on attempt {attempt+1}: {e}", file=sys.stderr)
+            time.sleep(3 ** attempt)
+        except Exception as e:
+            print(f"ERROR fetching NSE on attempt {attempt+1}: {e}", file=sys.stderr)
+            time.sleep(3 ** attempt)
+
+    return []
+
+
+def _parse_nse_ipos(data: any) -> list[dict]:
+    """Parse NSE response into IPO list."""
     results = []
 
     # Handle both direct list and wrapped object responses
@@ -164,14 +177,12 @@ def fetch_nse_ipos() -> list[dict]:
         elif status_raw == "Active":
             status = "LIVE"
         else:
-            # Unknown status, skip
             continue
 
         ipo = {
             "exchange": "NSE",
             "status": status,
             "name": item.get("companyName", "").strip() or item.get("company_name", "").strip(),
-            # NSE uses issueStartDate and issueEndDate instead of openDate/closeDate
             "open_date": item.get("issueStartDate", "") or item.get("openDate", "") or item.get("open_date", ""),
             "close_date": item.get("issueEndDate", "") or item.get("closeDate", "") or item.get("close_date", ""),
             "ipo_type": item.get("boardCode", "").strip() or item.get("board_code", "").strip() or "MainBoard",
