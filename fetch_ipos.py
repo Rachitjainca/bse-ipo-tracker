@@ -49,15 +49,28 @@ def fetch_bse_ipos() -> list[dict]:
             response = SESSION.get(api_url, timeout=10)
             response.raise_for_status()
             data = response.json()
+        except json.JSONDecodeError as e:
+            print(f"ERROR: BSE {status_label} returned invalid JSON: {e}", file=sys.stderr)
+            print(f"  Response text: {response.text[:200]}", file=sys.stderr)
+            continue
         except Exception as e:
             print(f"ERROR fetching BSE {status_label}: {e}", file=sys.stderr)
             continue
 
-        if not isinstance(data, list):
-            print(f"WARNING: BSE {status_label} response is not a list", file=sys.stderr)
+        # Handle both direct list and wrapped object responses
+        if isinstance(data, dict):
+            items = data.get("data", [])
+        elif isinstance(data, list):
+            items = data
+        else:
+            print(f"WARNING: BSE {status_label} returned unexpected type: {type(data)}", file=sys.stderr)
             continue
 
-        for item in data:
+        if not isinstance(items, list):
+            print(f"WARNING: BSE {status_label} data is not a list: {type(items)}", file=sys.stderr)
+            continue
+
+        for item in items:
             # Filter: only IR_flag="IPO" rows
             if item.get("IR_flag") != "IPO":
                 continue
@@ -82,16 +95,29 @@ def fetch_nse_ipos() -> list[dict]:
         response = SESSION.get(NSE_API, timeout=10)
         response.raise_for_status()
         data = response.json()
+    except json.JSONDecodeError as e:
+        print(f"ERROR: NSE returned invalid JSON: {e}", file=sys.stderr)
+        return []
     except Exception as e:
         print(f"ERROR fetching NSE IPOs: {e}", file=sys.stderr)
         return []
 
     results = []
-    if not isinstance(data, dict) or "data" not in data:
-        print(f"WARNING: NSE response format unexpected: {type(data)}", file=sys.stderr)
+
+    # Handle both direct list and wrapped object responses
+    if isinstance(data, dict):
+        items = data.get("data", [])
+    elif isinstance(data, list):
+        items = data
+    else:
+        print(f"WARNING: NSE returned unexpected type: {type(data)}", file=sys.stderr)
         return []
 
-    for item in data.get("data", []):
+    if not isinstance(items, list):
+        print(f"WARNING: NSE data is not a list: {type(items)}", file=sys.stderr)
+        return []
+
+    for item in items:
         status_raw = item.get("status", "").strip()
         if status_raw == "Forthcoming":
             status = "UPCOMING"
