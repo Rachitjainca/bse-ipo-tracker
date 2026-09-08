@@ -1,0 +1,42 @@
+name: Check BSE + NSE IPOs
+
+on:
+  schedule:
+    # Run every 6 hours: 12am, 6am, 12pm, 6pm UTC
+    - cron: "0 0,6,12,18 * * *"
+  workflow_dispatch:
+
+jobs:
+  check-ipos:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Run IPO tracker (BSE + NSE)
+        env:
+          GCHAT_WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}
+        run: python fetch_ipos.py
+
+      - name: Commit tracker updates
+        run: |
+          git config user.name "ipo-bot"
+          git config user.email "ipo-bot@github.local"
+          git add ipo_tracker.csv
+          git diff --cached --quiet || git commit -m "Update IPO tracker [skip ci]"
+          git push
