@@ -2,8 +2,8 @@ name: Check BSE + NSE IPOs
 
 on:
   schedule:
-    # Run every 6 hours: 12am, 6am, 12pm, 6pm UTC
-    - cron: "0 0,6,12,18 * * *"
+    # Run every hour at minute 0
+    - cron: "0 * * * *"
   workflow_dispatch:
 
 jobs:
