@@ -40,8 +40,8 @@ SESSION.headers.update({
 def fetch_bse_ipos() -> list[dict]:
     """Fetch IPOs from BSE Live and Upcoming APIs.
 
-    NOTE: BSE APIs are currently returning HTML (blocking/maintenance) as of Sep 2026.
-    When they recover, this will parse their JSON responses.
+    BSE returns: {"Table": [{...}, {...}]}
+    Filters for: IR_flag == "IPO" only (excludes FPO, RI, BuyBack, CMN, OTB, DPI, etc.)
     """
     results = []
 
@@ -54,16 +54,15 @@ def fetch_bse_ipos() -> list[dict]:
             response.raise_for_status()
             data = response.json()
         except json.JSONDecodeError as e:
-            # BSE returns HTML on error (blocking or maintenance)
-            print(f"WARNING: BSE {status_label} API not available (returning HTML, possibly blocked)", file=sys.stderr)
+            print(f"ERROR: BSE {status_label} returned invalid JSON: {e}", file=sys.stderr)
             continue
         except Exception as e:
             print(f"ERROR fetching BSE {status_label}: {e}", file=sys.stderr)
             continue
 
-        # Handle both direct list and wrapped object responses
+        # BSE wraps data in {"Table": [...]}
         if isinstance(data, dict):
-            items = data.get("data", [])
+            items = data.get("Table", [])
         elif isinstance(data, list):
             items = data
         else:
@@ -71,21 +70,23 @@ def fetch_bse_ipos() -> list[dict]:
             continue
 
         if not isinstance(items, list):
-            print(f"WARNING: BSE {status_label} data is not a list: {type(items)}", file=sys.stderr)
+            print(f"WARNING: BSE {status_label} 'Table' is not a list: {type(items)}", file=sys.stderr)
             continue
 
         for item in items:
-            # Filter: only IR_flag="IPO" rows
+            # Filter: ONLY IR_flag == "IPO" (exclude FPO, RI, BuyBack, CMN, OTB, DPI, etc.)
             if item.get("IR_flag") != "IPO":
                 continue
 
             ipo = {
                 "exchange": "BSE",
                 "status": status_label,
-                "name": item.get("scripname", "").strip() or item.get("Scrip_Name", "").strip(),
-                "open_date": item.get("Open_Date", "") or item.get("openDate", ""),
-                "close_date": item.get("Close_Date", "") or item.get("closeDate", ""),
-                "ipo_type": item.get("boardcode", "").strip() or item.get("BoardCode", "").strip(),
+                "name": item.get("Scrip_Name", "").strip(),
+                # BSE uses Start_Dt and End_Dt (ISO format)
+                "open_date": item.get("Start_Dt", "").split("T")[0] if item.get("Start_Dt") else "",
+                "close_date": item.get("End_Dt", "").split("T")[0] if item.get("End_Dt") else "",
+                # eXCHANGE_PLATFORM: "MainBoard" or "SME"
+                "ipo_type": item.get("eXCHANGE_PLATFORM", "").strip() or "MainBoard",
             }
             if ipo["name"]:
                 results.append(ipo)
