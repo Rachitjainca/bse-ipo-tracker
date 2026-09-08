@@ -104,8 +104,16 @@ def fetch_bse_ipos() -> list[dict]:
 
 def fetch_nse_ipos() -> list[dict]:
     """Fetch IPOs from NSE API. Status: 'Forthcoming' or 'Active'."""
+    # NSE requires its own Referer header (not BSE's)
+    nse_session = requests.Session()
+    nse_session.headers.update(SESSION.headers)
+    nse_session.headers.update({
+        "Referer": "https://www.nseindia.com/market-data/all-upcoming-issues-ipo",
+        "Origin": "https://www.nseindia.com",
+    })
+
     try:
-        response = SESSION.get(NSE_API, timeout=10)
+        response = nse_session.get(NSE_API, timeout=10)
         response.raise_for_status()
         data = response.json()
     except json.JSONDecodeError as e:
