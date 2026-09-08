@@ -38,7 +38,11 @@ SESSION.headers.update({
 
 
 def fetch_bse_ipos() -> list[dict]:
-    """Fetch IPOs from BSE Live and Upcoming APIs."""
+    """Fetch IPOs from BSE Live and Upcoming APIs.
+
+    NOTE: BSE APIs are currently returning HTML (blocking/maintenance) as of Sep 2026.
+    When they recover, this will parse their JSON responses.
+    """
     results = []
 
     for api_url, status_label in [
@@ -50,8 +54,8 @@ def fetch_bse_ipos() -> list[dict]:
             response.raise_for_status()
             data = response.json()
         except json.JSONDecodeError as e:
-            print(f"ERROR: BSE {status_label} returned invalid JSON: {e}", file=sys.stderr)
-            print(f"  Response text: {response.text[:200]}", file=sys.stderr)
+            # BSE returns HTML on error (blocking or maintenance)
+            print(f"WARNING: BSE {status_label} API not available (returning HTML, possibly blocked)", file=sys.stderr)
             continue
         except Exception as e:
             print(f"ERROR fetching BSE {status_label}: {e}", file=sys.stderr)
@@ -131,8 +135,9 @@ def fetch_nse_ipos() -> list[dict]:
             "exchange": "NSE",
             "status": status,
             "name": item.get("companyName", "").strip() or item.get("company_name", "").strip(),
-            "open_date": item.get("openDate", "") or item.get("open_date", ""),
-            "close_date": item.get("closeDate", "") or item.get("close_date", ""),
+            # NSE uses issueStartDate and issueEndDate instead of openDate/closeDate
+            "open_date": item.get("issueStartDate", "") or item.get("openDate", "") or item.get("open_date", ""),
+            "close_date": item.get("issueEndDate", "") or item.get("closeDate", "") or item.get("close_date", ""),
             "ipo_type": item.get("boardCode", "").strip() or item.get("board_code", "").strip() or "MainBoard",
         }
         if ipo["name"]:
