@@ -124,20 +124,24 @@ def fetch_nse_ipos() -> list[dict]:
 
     for attempt in range(max_retries):
         try:
-            # Get cookies from main page
             print(f"NSE attempt {attempt+1}/{max_retries}: Getting cookies...", file=sys.stderr)
             nse_session.get("https://www.nseindia.com/market-data/all-upcoming-issues-ipo", timeout=10)
             time.sleep(2)
 
-            # Fetch API
             print(f"NSE attempt {attempt+1}/{max_retries}: Fetching API...", file=sys.stderr)
             response = nse_session.get(NSE_API, timeout=10)
+
+            # Log response details BEFORE checking
+            print(f"NSE response status: {response.status_code}, len: {len(response.text)}", file=sys.stderr)
+            if response.text:
+                print(f"NSE response first 200 chars: {response.text[:200]}", file=sys.stderr)
+
             response.raise_for_status()
 
-            # Debug: check response
+            # Check if we got empty or HTML response
             if not response.text or response.text.startswith('<'):
-                print(f"WARNING: NSE returned empty/HTML response (status {response.status_code}): {response.text[:100]}", file=sys.stderr)
-                time.sleep(3 ** attempt)  # Exponential backoff
+                print(f"WARNING: NSE returned empty/HTML response", file=sys.stderr)
+                time.sleep(3 ** attempt)
                 continue
 
             data = response.json()
