@@ -30,10 +30,18 @@ GCHAT_WEBHOOK = os.environ.get("GCHAT_WEBHOOK_URL", "")
 # CSV columns to track
 FIELDNAMES = ["exchange", "status", "name", "open_date", "close_date", "ipo_type", "fetched_at"]
 
-# Session with retry headers to avoid NSE blocking
+# Session with retry headers to avoid API blocking
 SESSION = requests.Session()
 SESSION.headers.update({
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "Accept": "*/*",
+    "Accept-Encoding": "gzip, deflate, br, zstd",
+    "Accept-Language": "en-IN,en-US;q=0.9,en;q=0.8",
+    "Origin": "https://www.bseindia.com",
+    "Referer": "https://www.bseindia.com/",
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-site",
 })
 
 
