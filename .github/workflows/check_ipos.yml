@@ -33,10 +33,15 @@ jobs:
           GCHAT_WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}
         run: python fetch_ipos.py
 
+      - name: Run SEBI Pipeline tracker
+        env:
+          GCHAT_WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}
+        run: python fetch_sebi_pipeline.py
+
       - name: Commit tracker updates
         run: |
           git config user.name "ipo-bot"
           git config user.email "ipo-bot@github.local"
-          git add ipo_tracker.csv
-          git diff --cached --quiet || git commit -m "Update IPO tracker [skip ci]"
+          git add ipo_tracker.csv sebi_pipeline_tracker.csv
+          git diff --cached --quiet || git commit -m "Update IPO & pipeline trackers [skip ci]"
           git push
