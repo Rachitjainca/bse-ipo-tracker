@@ -50,17 +50,20 @@ def fetch_sebi_rhp_filings():
 
                     # Filter for RHP entries (exact match for RHP)
                     if date_text and 'RHP' in title_text and len(date_text) > 5:
-                        # Extract company name and clean it
+                        # Extract company name and clean it thoroughly
                         company = title_text.replace('RHP', '').replace('Red Herring Prospectus', '').strip()
                         company = company.replace('(Addendum)', '').replace('(Amendment)', '').strip()
 
-                        # Remove duplicates and extra prospectus text
-                        parts = company.split(' - ')
-                        company = parts[0].strip() if parts else company
-                        # Remove "Abridged Prospectus" suffix if present
-                        company = company.replace(' - Abridged Prospectus', '').replace('- Addendum to', '').strip()
+                        # Remove all types of dashes and extra text
+                        # Handle en-dashes, em-dashes, regular dashes
+                        company = company.replace(' – Addendum to', '').replace(' - Addendum to', '').replace(' — Addendum to', '').strip()
+                        company = company.replace(' – Abridged Prospectus', '').replace(' - Abridged Prospectus', '').replace(' — Abridged Prospectus', '').strip()
+                        company = company.replace(' – Amendment', '').replace(' - Amendment', '').replace(' — Amendment', '').strip()
 
-                        # Extract filing date from title_text if it has format like "(Sep 08, 2026)"
+                        # Remove any trailing dashes/special chars
+                        company = company.rstrip('-–—').strip()
+
+                        # Extract filing date (format like "(Sep 08, 2026)")
                         filing_date = date_text
                         if '(' in company and ')' in company:
                             date_part = company[company.rfind('('):company.rfind(')')+1]
