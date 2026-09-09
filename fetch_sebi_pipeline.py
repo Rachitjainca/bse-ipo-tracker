@@ -7,6 +7,7 @@ import csv
 import json
 import os
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -49,9 +50,23 @@ def fetch_sebi_rhp_filings():
 
                     # Filter for RHP entries (exact match for RHP)
                     if date_text and 'RHP' in title_text and len(date_text) > 5:
-                        # Extract company name
+                        # Extract company name and clean it
                         company = title_text.replace('RHP', '').replace('Red Herring Prospectus', '').strip()
                         company = company.replace('(Addendum)', '').replace('(Amendment)', '').strip()
+
+                        # Remove duplicates and extra prospectus text
+                        parts = company.split(' - ')
+                        company = parts[0].strip() if parts else company
+                        # Remove "Abridged Prospectus" suffix if present
+                        company = company.replace(' - Abridged Prospectus', '').replace('- Addendum to', '').strip()
+
+                        # Extract filing date from title_text if it has format like "(Sep 08, 2026)"
+                        filing_date = date_text
+                        if '(' in company and ')' in company:
+                            date_part = company[company.rfind('('):company.rfind(')')+1]
+                            if any(month in date_part for month in ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']):
+                                filing_date = date_part.strip('()')
+                                company = company[:company.rfind('(')].strip()
 
                         # Get document link
                         link_elem = cells[1].find('a')
@@ -201,6 +216,7 @@ def main():
         print(f"  ➕ [{ipo['company']}] Filed: {ipo['filing_date']}")
         send_gchat_alert(ipo['company'], ipo['filing_date'])
         save_pipeline_ipo(ipo)
+        time.sleep(0.5)  # Rate limit: avoid 429 errors from Google Chat
 
     if new_pipeline:
         print(f"✓ Processed {len(new_pipeline)} new pipeline IPO(s)")
