@@ -25,7 +25,8 @@ def fetch_sebi_rhp_filings():
     """Fetch recent SEBI RHP filings"""
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": "https://www.sebi.gov.in/",
         }
         response = requests.get(SEBI_URL, headers=headers, timeout=10)
         response.raise_for_status()
@@ -33,36 +34,44 @@ def fetch_sebi_rhp_filings():
         soup = BeautifulSoup(response.content, 'html.parser')
         filings = []
 
-        # Find table rows with filing data
-        rows = soup.find_all('tr')
+        # Find ALL table elements
+        tables = soup.find_all('table')
+        print(f"DEBUG: Found {len(tables)} tables on SEBI page", file=sys.stderr)
 
-        for row in rows:
-            cells = row.find_all('td')
-            if len(cells) >= 3:
-                date_text = cells[0].get_text(strip=True)
-                title_text = cells[1].get_text(strip=True)
+        # Try to find filings in any table
+        for table_idx, table in enumerate(tables):
+            rows = table.find_all('tr')
+            for row in rows:
+                cells = row.find_all('td')
+                if len(cells) >= 2:
+                    date_text = cells[0].get_text(strip=True)
+                    title_text = cells[1].get_text(strip=True)
 
-                # Filter for RHP entries
-                if date_text and 'RHP' in title_text and len(date_text) > 5:
-                    # Extract company name (before "RHP" or "Red Herring")
-                    company = title_text.replace('RHP', '').replace('Red Herring Prospectus', '').strip()
-                    company = company.replace('(Addendum)', '').strip()
+                    # Filter for RHP entries (exact match for RHP)
+                    if date_text and 'RHP' in title_text and len(date_text) > 5:
+                        # Extract company name
+                        company = title_text.replace('RHP', '').replace('Red Herring Prospectus', '').strip()
+                        company = company.replace('(Addendum)', '').replace('(Amendment)', '').strip()
 
-                    # Try to find document link
-                    link_elem = cells[1].find('a')
-                    sebi_url = link_elem.get('href', '') if link_elem else ''
+                        # Get document link
+                        link_elem = cells[1].find('a')
+                        sebi_url = link_elem.get('href', '') if link_elem else ''
 
-                    if company:
-                        filings.append({
-                            'company': company,
-                            'filing_date': date_text,
-                            'sebi_url': sebi_url
-                        })
+                        if company and len(company) > 3:  # Avoid empty/garbage entries
+                            filings.append({
+                                'company': company,
+                                'filing_date': date_text,
+                                'sebi_url': sebi_url
+                            })
+                            print(f"DEBUG: Found filing - {company} ({date_text})", file=sys.stderr)
 
+        print(f"DEBUG: Total filings extracted: {len(filings)}", file=sys.stderr)
         return filings
 
     except Exception as e:
         print(f"ERROR: Could not fetch SEBI data: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return []
 
 

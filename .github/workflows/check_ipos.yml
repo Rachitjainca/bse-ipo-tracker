@@ -42,6 +42,7 @@ jobs:
         run: |
           git config user.name "ipo-bot"
           git config user.email "ipo-bot@github.local"
-          git add ipo_tracker.csv sebi_pipeline_tracker.csv
+          git add ipo_tracker.csv
+          [ -f sebi_pipeline_tracker.csv ] && git add sebi_pipeline_tracker.csv || true
           git diff --cached --quiet || git commit -m "Update IPO & pipeline trackers [skip ci]"
           git push
