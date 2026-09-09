@@ -54,14 +54,18 @@ def fetch_sebi_rhp_filings():
                         company = title_text.replace('RHP', '').replace('Red Herring Prospectus', '').strip()
                         company = company.replace('(Addendum)', '').replace('(Amendment)', '').strip()
 
-                        # Remove all types of dashes and extra text
-                        # Handle en-dashes, em-dashes, regular dashes
-                        company = company.replace(' – Addendum to', '').replace(' - Addendum to', '').replace(' — Addendum to', '').strip()
-                        company = company.replace(' – Abridged Prospectus', '').replace(' - Abridged Prospectus', '').replace(' — Abridged Prospectus', '').strip()
-                        company = company.replace(' – Amendment', '').replace(' - Amendment', '').replace(' — Amendment', '').strip()
+                        # Handle "Company Name - Company Name" duplicates (split on dash and take first)
+                        # This is a common pattern in SEBI HTML
+                        parts = company.split('-')
+                        if len(parts) > 1:
+                            company = parts[0].strip()
 
-                        # Remove any trailing dashes/special chars
-                        company = company.rstrip('-–—').strip()
+                        # Remove remaining Addendum/Amendment/Abridged text
+                        for text_to_remove in [' Addendum to', ' Abridged Prospectus', ' Amendment', 'Addendum', 'Amendment', 'Abridged Prospectus']:
+                            company = company.replace(text_to_remove, '').strip()
+
+                        # Final cleanup: remove extra spaces and special chars
+                        company = ' '.join(company.split()).strip()
 
                         # Extract filing date (format like "(Sep 08, 2026)")
                         filing_date = date_text
