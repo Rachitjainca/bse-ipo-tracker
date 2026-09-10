@@ -6,6 +6,7 @@ SEBI RHP Pipeline Tracker - Tracks companies filed with SEBI but not yet live on
 import csv
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime
@@ -54,10 +55,10 @@ def fetch_sebi_rhp_filings():
                         company = title_text.replace('RHP', '').replace('Red Herring Prospectus', '').strip()
                         company = company.replace('(Addendum)', '').replace('(Amendment)', '').strip()
 
-                        # Handle "Company Name - Company Name" duplicates (split on dash and take first)
-                        # This is a common pattern in SEBI HTML
-                        parts = company.split('-')
-                        if len(parts) > 1:
+                        # Handle "Company Name - Company Name" duplicates (split on ANY dash type and take first)
+                        # SEBI uses: - (hyphen), – (en-dash), — (em-dash)
+                        parts = re.split(r'[-–—]', company, maxsplit=1)
+                        if len(parts) > 1 and parts[0].strip():
                             company = parts[0].strip()
 
                         # Remove remaining Addendum/Amendment/Abridged text
